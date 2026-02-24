@@ -135,234 +135,170 @@ CombatSection:Toggle("Hitbox Expander", false, function(state)
     end
 end)
 
-local ESPTab = Library:Tab("ESP")
-local ESPSection = ESPTab:Section("Advanced Visuals")
-
-local Players = game:GetService("Players")
-local lp = Players.LocalPlayer
-local cam = workspace.CurrentCamera
-
-local ESP = {
-    Enabled = false,
-    Boxes = false,
-    Names = false,
-    Tracers = false,
-    HealthBar = false,
-    Distance = false,
-    Chams = false,
-    TeamCheck = false,
-    VisibilityCheck = false
+-----------------------------
+-- SETTINGS
+-----------------------------
+local Settings = {
+    SkeletonESP = false,
+    SkeletonColor = Color3.fromRGB(255, 255, 255),
+    SkeletonThickness = 1,
+    SkeletonTransparency = 1,
 }
 
-local Drawings = {}
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- Create drawing objects for each player
-local function NewDrawing(type)
-    local obj = Drawing.new(type)
-    obj.Visible = false
-    return obj
+local Drawings = {
+    Skeleton = {}
+}
+
+-----------------------------
+-- SKELETON BONES
+-----------------------------
+local Bones = {
+    {"Head", "UpperTorso"},
+    {"UpperTorso", "LowerTorso"},
+    {"LowerTorso", "LeftUpperLeg"},
+    {"LeftUpperLeg", "LeftLowerLeg"},
+    {"LeftLowerLeg", "LeftFoot"},
+    {"LowerTorso", "RightUpperLeg"},
+    {"RightUpperLeg", "RightLowerLeg"},
+    {"RightLowerLeg", "RightFoot"},
+    {"UpperTorso", "LeftUpperArm"},
+    {"LeftUpperArm", "LeftLowerArm"},
+    {"LeftLowerArm", "LeftHand"},
+    {"UpperTorso", "RightUpperArm"},
+    {"RightUpperArm", "RightLowerArm"},
+    {"RightLowerArm", "RightHand"},
+}
+
+-----------------------------
+-- CREATE SKELETON ESP
+-----------------------------
+local function CreateESP(player)
+    if Drawings.Skeleton[player] then return end
+
+    Drawings.Skeleton[player] = {}
+
+    for _, bone in ipairs(Bones) do
+        local line = Drawing.new("Line")
+        line.Visible = false
+        line.Color = Settings.SkeletonColor
+        line.Thickness = Settings.SkeletonThickness
+        line.Transparency = Settings.SkeletonTransparency
+        table.insert(Drawings.Skeleton[player], line)
+    end
 end
 
-local function SetupPlayer(plr)
-    if plr == lp then return end
+-----------------------------
+-- REMOVE ESP
+-----------------------------
+local function RemoveESP(player)
+    if Drawings.Skeleton[player] then
+        for _, line in ipairs(Drawings.Skeleton[player]) do
+            line:Remove()
+        end
+        Drawings.Skeleton[player] = nil
+    end
+end
 
-    Drawings[plr] = {
-        BoxOutline = NewDrawing("Square"),
-        Box = NewDrawing("Square"),
-        Name = NewDrawing("Text"),
-        Tracer = NewDrawing("Line"),
-        HealthBarOutline = NewDrawing("Square"),
-        HealthBar = NewDrawing("Square"),
-        Distance = NewDrawing("Text"),
-        Cham = Instance.new("Highlight")
+-----------------------------
+-- UPDATE SKELETON ESP
+-----------------------------
+local function UpdateESP(player)
+    if not Settings.SkeletonESP then
+        if Drawings.Skeleton[player] then
+            for _, line in ipairs(Drawings.Skeleton[player]) do
+                line.Visible = false
+            end
+        end
+        return
+    end
+
+    local char = player.Character
+    if not char then return end
+
+    local skeleton = Drawings.Skeleton[player]
+    if not skeleton then return end
+
+    local index = 1
+
+    for _, bone in ipairs(Bones) do
+        local part1 = char:FindFirstChild(bone[1])
+        local part2 = char:FindFirstChild(bone[2])
+
+        local line = skeleton[index]
+        index += 1
+
+        if part1 and part2 then
+            local p1, v1 = Camera:WorldToViewportPoint(part1.Position)
+            local p2, v2 = Camera:WorldToViewportPoint(part2.Position)
+
+            if v1 and v2 then
+                line.Visible = true
+                line.From = Vector2.new(p1.X, p1.Y)
+                line.To = Vector2.new(p2.X, p2.Y)
+                line.Color = Settings.SkeletonColor
+                line.Thickness = Settings.SkeletonThickness
+                line.Transparency = Settings.SkeletonTransparency
+            else
+                line.Visible = false
+            end
+        else
+            line.Visible = false
+        end
+    end
+end
+
+-----------------------------
+-- PLAYER EVENTS
+-----------------------------
+Players.PlayerAdded:Connect(CreateESP)
+Players.PlayerRemoving:Connect(RemoveESP)
+
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        CreateESP(player)
+    end
+end
+
+-----------------------------
+-- RENDER LOOP
+-----------------------------
+RunService.RenderStepped:Connect(function()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            UpdateESP(player)
+        end
+    end
+end)
+
+-----------------------------
+-- UI IMPLEMENTATION
+-----------------------------
+local SkeletonTab = Library:Tab("ESP")
+local Section = SkeletonTab:Section("Skeleton ESP")
+
+Section:Toggle("Skeleton ESP", false, function(v)
+    Settings.SkeletonESP = v
+end)
+
+Section:Slider("Line Thickness", 1, 1, 3, function(v)
+    Settings.SkeletonThickness = v
+end)
+
+Section:Slider("Transparency", 1, 0, 1, function(v)
+    Settings.SkeletonTransparency = v
+end)
+
+Section:Dropdown("Color", {"White", "Red", "Green", "Blue"}, "White", function(v)
+    local colors = {
+        White = Color3.fromRGB(255,255,255),
+        Red = Color3.fromRGB(255,0,0),
+        Green = Color3.fromRGB(0,255,0),
+        Blue = Color3.fromRGB(0,0,255)
     }
-
-    local cham = Drawings[plr].Cham
-    cham.FillColor = Color3.fromRGB(255, 0, 0)
-    cham.OutlineColor = Color3.fromRGB(255, 255, 255)
-    cham.FillTransparency = 0.5
-    cham.OutlineTransparency = 0
-    cham.Enabled = false
-end
-
--- Remove ESP when player leaves
-Players.PlayerRemoving:Connect(function(plr)
-    if Drawings[plr] then
-        for _, obj in pairs(Drawings[plr]) do
-            if typeof(obj) == "Instance" then
-                obj:Destroy()
-            else
-                obj:Remove()
-            end
-        end
-        Drawings[plr] = nil
-    end
+    Settings.SkeletonColor = colors[v]
 end)
-
--- Setup existing players
-for _, plr in pairs(Players:GetPlayers()) do
-    SetupPlayer(plr)
-end
-
-Players.PlayerAdded:Connect(function(plr)
-    plr.CharacterAdded:Wait()
-    SetupPlayer(plr)
-end)
-
--- ESP Loop
-task.spawn(function()
-    while task.wait() do
-        if not ESP.Enabled then
-            for _, objs in pairs(Drawings) do
-                for _, obj in pairs(objs) do
-                    if typeof(obj) ~= "Instance" then
-                        obj.Visible = false
-                    else
-                        obj.Enabled = false
-                    end
-                end
-            end
-            continue
-        end
-
-        for plr, objs in pairs(Drawings) do
-            local char = plr.Character
-            if not char or not char:FindFirstChild("HumanoidRootPart") then
-                for _, obj in pairs(objs) do
-                    if typeof(obj) ~= "Instance" then obj.Visible = false end
-                end
-                continue
-            end
-
-            local hrp = char.HumanoidRootPart
-            local hum = char:FindFirstChild("Humanoid")
-
-            -- Team check
-            if ESP.TeamCheck and plr.Team == lp.Team then
-                for _, obj in pairs(objs) do
-                    if typeof(obj) ~= "Instance" then obj.Visible = false end
-                end
-                objs.Cham.Enabled = false
-                continue
-            end
-
-            local pos, onScreen = cam:WorldToViewportPoint(hrp.Position)
-            if not onScreen then
-                for _, obj in pairs(objs) do
-                    if typeof(obj) ~= "Instance" then obj.Visible = false end
-                end
-                objs.Cham.Enabled = false
-                continue
-            end
-
-            -- Visibility check (raycast)
-            local visible = true
-            if ESP.VisibilityCheck then
-                local ray = Ray.new(cam.CFrame.Position, (hrp.Position - cam.CFrame.Position).Unit * 500)
-                local hit = workspace:FindPartOnRay(ray, lp.Character)
-                visible = hit and hit:IsDescendantOf(char)
-            end
-
-            local color = visible and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-
-            -- Box ESP (dynamic size)
-            if ESP.Boxes then
-                local scale = 1 / (pos.Z * 0.002)
-                local width = 35 * scale
-                local height = 55 * scale
-
-                objs.BoxOutline.Visible = true
-                objs.BoxOutline.Color = Color3.new(0, 0, 0)
-                objs.BoxOutline.Thickness = 3
-                objs.BoxOutline.Size = Vector2.new(width, height)
-                objs.BoxOutline.Position = Vector2.new(pos.X - width/2, pos.Y - height)
-
-                objs.Box.Visible = true
-                objs.Box.Color = color
-                objs.Box.Thickness = 1
-                objs.Box.Size = Vector2.new(width, height)
-                objs.Box.Position = Vector2.new(pos.X - width/2, pos.Y - height)
-            else
-                objs.Box.Visible = false
-                objs.BoxOutline.Visible = false
-            end
-
-            -- Name ESP
-            if ESP.Names then
-                objs.Name.Visible = true
-                objs.Name.Text = plr.Name
-                objs.Name.Color = color
-                objs.Name.Size = 16
-                objs.Name.Center = true
-                objs.Name.Position = Vector2.new(pos.X, pos.Y - 60)
-            else
-                objs.Name.Visible = false
-            end
-
-            -- Tracers
-            if ESP.Tracers then
-                objs.Tracer.Visible = true
-                objs.Tracer.Color = color
-                objs.Tracer.Thickness = 1
-                objs.Tracer.From = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y)
-                objs.Tracer.To = Vector2.new(pos.X, pos.Y)
-            else
-                objs.Tracer.Visible = false
-            end
-
-            -- Health bar
-            if ESP.HealthBar then
-                local hp = hum.Health / hum.MaxHealth
-                local barHeight = 55 * (1 / (pos.Z * 0.002))
-
-                objs.HealthBarOutline.Visible = true
-                objs.HealthBarOutline.Color = Color3.new(0, 0, 0)
-                objs.HealthBarOutline.Size = Vector2.new(4, barHeight)
-                objs.HealthBarOutline.Position = Vector2.new(pos.X - 40, pos.Y - barHeight)
-
-                objs.HealthBar.Visible = true
-                objs.HealthBar.Color = Color3.fromRGB(0, 255, 0)
-                objs.HealthBar.Size = Vector2.new(2, barHeight * hp)
-                objs.HealthBar.Position = Vector2.new(pos.X - 39, pos.Y - (barHeight * hp))
-            else
-                objs.HealthBar.Visible = false
-                objs.HealthBarOutline.Visible = false
-            end
-
-            -- Distance ESP
-            if ESP.Distance then
-                local dist = math.floor((lp.Character.HumanoidRootPart.Position - hrp.Position).Magnitude)
-                objs.Distance.Visible = true
-                objs.Distance.Text = dist .. "m"
-                objs.Distance.Color = color
-                objs.Distance.Size = 14
-                objs.Distance.Center = true
-                objs.Distance.Position = Vector2.new(pos.X, pos.Y + 60)
-            else
-                objs.Distance.Visible = false
-            end
-
-            -- Chams
-            objs.Cham.Enabled = ESP.Chams
-            objs.Cham.FillColor = color
-            objs.Cham.Parent = char
-        end
-    end
-end)
-
-----------------------------------------------------
--- UI Toggles
-----------------------------------------------------
-
-ESPSection:Toggle("Enable ESP", false, function(v) ESP.Enabled = v end)
-ESPSection:Toggle("Boxes", false, function(v) ESP.Boxes = v end)
-ESPSection:Toggle("Names", false, function(v) ESP.Names = v end)
-ESPSection:Toggle("Tracers", false, function(v) ESP.Tracers = v end)
-ESPSection:Toggle("Health Bar", false, function(v) ESP.HealthBar = v end)
-ESPSection:Toggle("Distance", false, function(v) ESP.Distance = v end)
-ESPSection:Toggle("Chams", false, function(v) ESP.Chams = v end)
-ESPSection:Toggle("Team Check", false, function(v) ESP.TeamCheck = v end)
-ESPSection:Toggle("Visibility Check", false, function(v) ESP.VisibilityCheck = v end)
-
-
-
