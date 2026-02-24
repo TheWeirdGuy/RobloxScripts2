@@ -17,32 +17,80 @@ end)
 local Combat = Window:NewTab("Combat")
 local CombatSection = Combat:NewSection("Universal Combat")
 
--- UNIVERSAL AIMLOCK
-CombatSection:NewToggle("Aimlock", "Locks aim onto nearest player", function(state)
-    getgenv().Aimlock = state
+-- UNIVERSAL AIMLOCK (RMB HOLD)
+CombatSection:NewToggle("Aimlock (Hold RMB)", "Locks aim only while holding right mouse button", function(state)
+    getgenv().AimlockEnabled = state
 
+    local UserInputService = game:GetService("UserInputService")
     local cam = workspace.CurrentCamera
     local lp = game.Players.LocalPlayer
 
-    while getgenv().Aimlock do
-        task.wait()
+    local holding = false
 
-        local closest, dist = nil, 999
+    -- Detect RMB hold
+    UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            holding = true
+        end
+    end)
 
-        for _, plr in pairs(game.Players:GetPlayers()) do
-            if plr ~= lp and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local mag = (lp.Character.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
-                if mag < dist then
-                    dist = mag
-                    closest = plr
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            holding = false
+        end
+    end)
+
+    -- Aimlock loop
+    task.spawn(function()
+        while getgenv().AimlockEnabled do
+            task.wait()
+
+            if holding then
+                local closest, dist = nil, 999
+
+                for _, plr in pairs(game.Players:GetPlayers()) do
+                    if plr ~= lp and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                        local mag = (lp.Character.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+                        if mag < dist then
+                            dist = mag
+                            closest = plr
+                        end
+                    end
+                end
+
+                if closest then
+                    cam.CFrame = CFrame.new(
+                        cam.CFrame.Position,
+                        closest.Character.HumanoidRootPart.Position
+                    )
                 end
             end
         end
+    end)
+end)
 
-        if closest then
-            cam.CFrame = CFrame.new(cam.CFrame.Position, closest.Character.HumanoidRootPart.Position)
+-- FOV CIRCLE
+local FOV = Drawing.new("Circle")
+FOV.Visible = false
+FOV.Thickness = 2
+FOV.Radius = 120
+FOV.Color = Color3.fromRGB(255, 255, 0)
+FOV.Filled = false
+FOV.NumSides = 100
+
+CombatSection:NewToggle("FOV Circle", "Shows your aimlock FOV", function(state)
+    FOV.Visible = state
+
+    task.spawn(function()
+        while state do
+            task.wait()
+            FOV.Position = game:GetService("UserInputService"):GetMouseLocation()
         end
-    end
+    end)
+end)
+
+CombatSection:NewSlider("FOV Size", "Adjust the FOV radius", 300, 50, function(value)
+    FOV.Radius = value
 end)
 
 -- UNIVERSAL HITBOX EXPANDER
