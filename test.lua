@@ -134,36 +134,45 @@ CombatSection:Toggle("Hitbox Expander", false, function(state)
         end
     end
 end)
-
 local ESPTab = Library:Tab("ESP")
-local ESPSection = ESPTab:Section("Visuals")
+local ESPSection = ESPTab:Section("Advanced Visuals")
 
 local Players = game:GetService("Players")
 local lp = Players.LocalPlayer
 local cam = workspace.CurrentCamera
 
-local ESPSettings = {
+local ESP = {
     Enabled = false,
     Boxes = false,
     Names = false,
     Tracers = false,
-    Health = false,
+    HealthBar = false,
     Distance = false,
     Chams = false,
-    TeamCheck = false
+    TeamCheck = false,
+    VisibilityCheck = false
 }
 
 local Drawings = {}
 
 -- Create drawing objects for each player
-local function CreateESP(plr)
+local function NewDrawing(type)
+    local obj = Drawing.new(type)
+    obj.Visible = false
+    return obj
+end
+
+local function SetupPlayer(plr)
     if plr == lp then return end
+
     Drawings[plr] = {
-        Box = Drawing.new("Square"),
-        Name = Drawing.new("Text"),
-        Tracer = Drawing.new("Line"),
-        Health = Drawing.new("Text"),
-        Distance = Drawing.new("Text"),
+        BoxOutline = NewDrawing("Square"),
+        Box = NewDrawing("Square"),
+        Name = NewDrawing("Text"),
+        Tracer = NewDrawing("Line"),
+        HealthBarOutline = NewDrawing("Square"),
+        HealthBar = NewDrawing("Square"),
+        Distance = NewDrawing("Text"),
         Cham = Instance.new("Highlight")
     }
 
@@ -173,7 +182,6 @@ local function CreateESP(plr)
     cham.FillTransparency = 0.5
     cham.OutlineTransparency = 0
     cham.Enabled = false
-    cham.Parent = plr.Character
 end
 
 -- Remove ESP when player leaves
@@ -190,21 +198,20 @@ Players.PlayerRemoving:Connect(function(plr)
     end
 end)
 
--- Create ESP for existing players
+-- Setup existing players
 for _, plr in pairs(Players:GetPlayers()) do
-    CreateESP(plr)
+    SetupPlayer(plr)
 end
 
--- Create ESP for new players
 Players.PlayerAdded:Connect(function(plr)
     plr.CharacterAdded:Wait()
-    CreateESP(plr)
+    SetupPlayer(plr)
 end)
 
 -- ESP Loop
 task.spawn(function()
     while task.wait() do
-        if not ESPSettings.Enabled then
+        if not ESP.Enabled then
             for _, objs in pairs(Drawings) do
                 for _, obj in pairs(objs) do
                     if typeof(obj) ~= "Instance" then
@@ -218,130 +225,51 @@ task.spawn(function()
         end
 
         for plr, objs in pairs(Drawings) do
-            if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local hrp = plr.Character.HumanoidRootPart
-                local hum = plr.Character:FindFirstChild("Humanoid")
-
-                if ESPSettings.TeamCheck and plr.Team == lp.Team then
-                    objs.Box.Visible = false
-                    objs.Name.Visible = false
-                    objs.Tracer.Visible = false
-                    objs.Health.Visible = false
-                    objs.Distance.Visible = false
-                    objs.Cham.Enabled = false
-                    continue
+            local char = plr.Character
+            if not char or not char:FindFirstChild("HumanoidRootPart") then
+                for _, obj in pairs(objs) do
+                    if typeof(obj) ~= "Instance" then obj.Visible = false end
                 end
-
-                local pos, onScreen = cam:WorldToViewportPoint(hrp.Position)
-                if not onScreen then
-                    objs.Box.Visible = false
-                    objs.Name.Visible = false
-                    objs.Tracer.Visible = false
-                    objs.Health.Visible = false
-                    objs.Distance.Visible = false
-                    objs.Cham.Enabled = false
-                    continue
-                end
-
-                -- BOX ESP
-                if ESPSettings.Boxes then
-                    objs.Box.Visible = true
-                    objs.Box.Size = Vector2.new(50, 75)
-                    objs.Box.Position = Vector2.new(pos.X - 25, pos.Y - 75)
-                    objs.Box.Color = Color3.fromRGB(255, 255, 255)
-                    objs.Box.Thickness = 2
-                else
-                    objs.Box.Visible = false
-                end
-
-                -- NAME ESP
-                if ESPSettings.Names then
-                    objs.Name.Visible = true
-                    objs.Name.Text = plr.Name
-                    objs.Name.Position = Vector2.new(pos.X, pos.Y - 90)
-                    objs.Name.Color = Color3.fromRGB(255, 255, 255)
-                    objs.Name.Size = 16
-                    objs.Name.Center = true
-                else
-                    objs.Name.Visible = false
-                end
-
-                -- TRACERS
-                if ESPSettings.Tracers then
-                    objs.Tracer.Visible = true
-                    objs.Tracer.From = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y)
-                    objs.Tracer.To = Vector2.new(pos.X, pos.Y)
-                    objs.Tracer.Color = Color3.fromRGB(255, 255, 255)
-                    objs.Tracer.Thickness = 1
-                else
-                    objs.Tracer.Visible = false
-                end
-
-                -- HEALTH ESP
-                if ESPSettings.Health then
-                    objs.Health.Visible = true
-                    objs.Health.Text = "HP: " .. math.floor(hum.Health)
-                    objs.Health.Position = Vector2.new(pos.X, pos.Y + 40)
-                    objs.Health.Color = Color3.fromRGB(0, 255, 0)
-                    objs.Health.Size = 14
-                    objs.Health.Center = true
-                else
-                    objs.Health.Visible = false
-                end
-
-                -- DISTANCE ESP
-                if ESPSettings.Distance then
-                    local dist = math.floor((lp.Character.HumanoidRootPart.Position - hrp.Position).Magnitude)
-                    objs.Distance.Visible = true
-                    objs.Distance.Text = dist .. "m"
-                    objs.Distance.Position = Vector2.new(pos.X, pos.Y + 55)
-                    objs.Distance.Color = Color3.fromRGB(255, 255, 0)
-                    objs.Distance.Size = 14
-                    objs.Distance.Center = true
-                else
-                    objs.Distance.Visible = false
-                end
-
-                -- CHAMS
-                objs.Cham.Enabled = ESPSettings.Chams
+                continue
             end
-        end
-    end
-end)
 
-----------------------------------------------------
--- UI Toggles
-----------------------------------------------------
+            local hrp = char.HumanoidRootPart
+            local hum = char:FindFirstChild("Humanoid")
 
-ESPSection:Toggle("Enable ESP", false, function(v)
-    ESPSettings.Enabled = v
-end)
+            -- Team check
+            if ESP.TeamCheck and plr.Team == lp.Team then
+                for _, obj in pairs(objs) do
+                    if typeof(obj) ~= "Instance" then obj.Visible = false end
+                end
+                objs.Cham.Enabled = false
+                continue
+            end
 
-ESPSection:Toggle("Boxes", false, function(v)
-    ESPSettings.Boxes = v
-end)
+            local pos, onScreen = cam:WorldToViewportPoint(hrp.Position)
+            if not onScreen then
+                for _, obj in pairs(objs) do
+                    if typeof(obj) ~= "Instance" then obj.Visible = false end
+                end
+                objs.Cham.Enabled = false
+                continue
+            end
 
-ESPSection:Toggle("Names", false, function(v)
-    ESPSettings.Names = v
-end)
+            -- Visibility check (raycast)
+            local visible = true
+            if ESP.VisibilityCheck then
+                local ray = Ray.new(cam.CFrame.Position, (hrp.Position - cam.CFrame.Position).Unit * 500)
+                local hit = workspace:FindPartOnRay(ray, lp.Character)
+                visible = hit and hit:IsDescendantOf(char)
+            end
 
-ESPSection:Toggle("Tracers", false, function(v)
-    ESPSettings.Tracers = v
-end)
+            local color = visible and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
 
-ESPSection:Toggle("Health ESP", false, function(v)
-    ESPSettings.Health = v
-end)
+            -- Box ESP (dynamic size)
+            if ESP.Boxes then
+                local scale = 1 / (pos.Z * 0.002)
+                local width = 35 * scale
+                local height = 55 * scale
 
-ESPSection:Toggle("Distance ESP", false, function(v)
-    ESPSettings.Distance = v
-end)
-
-ESPSection:Toggle("Chams (Highlight)", false, function(v)
-    ESPSettings.Chams = v
-end)
-
-ESPSection:Toggle("Team Check", false, function(v)
-    ESPSettings.TeamCheck = v
-end)
-
+                objs.BoxOutline.Visible = true
+                objs.BoxOutline.Color = Color3.new(0, 0, 0)
+                objs.BoxOutline
