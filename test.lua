@@ -134,6 +134,7 @@ CombatSection:Toggle("Hitbox Expander", false, function(state)
         end
     end
 end)
+
 local ESPTab = Library:Tab("ESP")
 local ESPSection = ESPTab:Section("Advanced Visuals")
 
@@ -272,4 +273,96 @@ task.spawn(function()
 
                 objs.BoxOutline.Visible = true
                 objs.BoxOutline.Color = Color3.new(0, 0, 0)
-                objs.BoxOutline
+                objs.BoxOutline.Thickness = 3
+                objs.BoxOutline.Size = Vector2.new(width, height)
+                objs.BoxOutline.Position = Vector2.new(pos.X - width/2, pos.Y - height)
+
+                objs.Box.Visible = true
+                objs.Box.Color = color
+                objs.Box.Thickness = 1
+                objs.Box.Size = Vector2.new(width, height)
+                objs.Box.Position = Vector2.new(pos.X - width/2, pos.Y - height)
+            else
+                objs.Box.Visible = false
+                objs.BoxOutline.Visible = false
+            end
+
+            -- Name ESP
+            if ESP.Names then
+                objs.Name.Visible = true
+                objs.Name.Text = plr.Name
+                objs.Name.Color = color
+                objs.Name.Size = 16
+                objs.Name.Center = true
+                objs.Name.Position = Vector2.new(pos.X, pos.Y - 60)
+            else
+                objs.Name.Visible = false
+            end
+
+            -- Tracers
+            if ESP.Tracers then
+                objs.Tracer.Visible = true
+                objs.Tracer.Color = color
+                objs.Tracer.Thickness = 1
+                objs.Tracer.From = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y)
+                objs.Tracer.To = Vector2.new(pos.X, pos.Y)
+            else
+                objs.Tracer.Visible = false
+            end
+
+            -- Health bar
+            if ESP.HealthBar then
+                local hp = hum.Health / hum.MaxHealth
+                local barHeight = 55 * (1 / (pos.Z * 0.002))
+
+                objs.HealthBarOutline.Visible = true
+                objs.HealthBarOutline.Color = Color3.new(0, 0, 0)
+                objs.HealthBarOutline.Size = Vector2.new(4, barHeight)
+                objs.HealthBarOutline.Position = Vector2.new(pos.X - 40, pos.Y - barHeight)
+
+                objs.HealthBar.Visible = true
+                objs.HealthBar.Color = Color3.fromRGB(0, 255, 0)
+                objs.HealthBar.Size = Vector2.new(2, barHeight * hp)
+                objs.HealthBar.Position = Vector2.new(pos.X - 39, pos.Y - (barHeight * hp))
+            else
+                objs.HealthBar.Visible = false
+                objs.HealthBarOutline.Visible = false
+            end
+
+            -- Distance ESP
+            if ESP.Distance then
+                local dist = math.floor((lp.Character.HumanoidRootPart.Position - hrp.Position).Magnitude)
+                objs.Distance.Visible = true
+                objs.Distance.Text = dist .. "m"
+                objs.Distance.Color = color
+                objs.Distance.Size = 14
+                objs.Distance.Center = true
+                objs.Distance.Position = Vector2.new(pos.X, pos.Y + 60)
+            else
+                objs.Distance.Visible = false
+            end
+
+            -- Chams
+            objs.Cham.Enabled = ESP.Chams
+            objs.Cham.FillColor = color
+            objs.Cham.Parent = char
+        end
+    end
+end)
+
+----------------------------------------------------
+-- UI Toggles
+----------------------------------------------------
+
+ESPSection:Toggle("Enable ESP", false, function(v) ESP.Enabled = v end)
+ESPSection:Toggle("Boxes", false, function(v) ESP.Boxes = v end)
+ESPSection:Toggle("Names", false, function(v) ESP.Names = v end)
+ESPSection:Toggle("Tracers", false, function(v) ESP.Tracers = v end)
+ESPSection:Toggle("Health Bar", false, function(v) ESP.HealthBar = v end)
+ESPSection:Toggle("Distance", false, function(v) ESP.Distance = v end)
+ESPSection:Toggle("Chams", false, function(v) ESP.Chams = v end)
+ESPSection:Toggle("Team Check", false, function(v) ESP.TeamCheck = v end)
+ESPSection:Toggle("Visibility Check", false, function(v) ESP.VisibilityCheck = v end)
+
+
+
