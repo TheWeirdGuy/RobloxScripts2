@@ -50,67 +50,162 @@ CombatSection:Slider("FOV Size", 120, 50, 300, function(value)
     FOV.Radius = value
 end)
 
-----------------------------------------------------
--- AIMLOCK (RMB HOLD + FOV CHECK + WALL CHECK)
-----------------------------------------------------
-CombatSection:Toggle("Aimlock (Hold RMB)", false, function(state)
-    getgenv().AimlockEnabled = state
+-----------------------------
+-- AIMLOCK SETTINGS
+-----------------------------
+local Aimbot = {
+    Enabled = false,
+    HoldKey = Enum.UserInputType.MouseButton2,
+    FOV = 120,
+    Smoothness = 0.20,
+    Prediction = 0.12,
+    HitChance = 100,
+    WallCheck = true,
+    TeamCheck = false,
+    TargetPart = "Head"
+}
 
-    local holding = false
+local UIS = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
-    UIS.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton2 then
-            holding = true
-        end
-    end)
+local Holding = false
 
-    UIS.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton2 then
-            holding = false
-        end
-    end)
+-----------------------------
+-- FOV CIRCLE
+-----------------------------
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = true
+FOVCircle.Color = Color3.fromRGB(255, 255, 0)
+FOVCircle.Thickness = 2
+FOVCircle.Radius = Aimbot.FOV
+FOVCircle.Filled = false
+FOVCircle.NumSides = 100
 
-    task.spawn(function()
-        while getgenv().AimlockEnabled do
-            task.wait()
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Position = UIS:GetMouseLocation()
+    FOVCircle.Radius = Aimbot.FOV
+end)
 
-            if holding then
-                local closest = nil
-                local closestDist = 999
+-----------------------------
+-- GET CLOSEST PLAYER
+-----------------------------
+local function GetClosest()
+    local mousePos = UIS:GetMouseLocation()
+    local closest = nil
+    local closestDist = Aimbot.FOV
 
-                for _, plr in pairs(game.Players:GetPlayers()) do
-                    if plr ~= lp and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                        local hrp = plr.Character.HumanoidRootPart
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild(Aimbot.TargetPart) then
 
-                        local screenPos, onScreen = cam:WorldToViewportPoint(hrp.Position)
-                        if onScreen then
-                            local mousePos = UIS:GetMouseLocation()
-                            local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+            if Aimbot.TeamCheck and plr.Team == LocalPlayer.Team then
+                continue
+            end
 
-                            if dist <= FOV.Radius then
-                                local ray = Ray.new(cam.CFrame.Position, (hrp.Position - cam.CFrame.Position).Unit * 500)
-                                local hit = workspace:FindPartOnRay(ray, lp.Character)
+            local part = plr.Character[Aimbot.TargetPart]
+            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
 
-                                if hit and hit:IsDescendantOf(plr.Character) then
-                                    if dist < closestDist then
-                                        closestDist = dist
-                                        closest = plr
-                                    end
-                                end
-                            end
+            if onScreen then
+                local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                if dist < closestDist then
+
+                    -- WALL CHECK
+                    if Aimbot.WallCheck then
+                        local ray = Ray.new(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 500)
+                        local hit = workspace:FindPartOnRay(ray, LocalPlayer.Character)
+
+                        if hit and not hit:IsDescendantOf(plr.Character) then
+                            continue
                         end
                     end
-                end
 
-                if closest then
-                    cam.CFrame = CFrame.new(
-                        cam.CFrame.Position,
-                        closest.Character.HumanoidRootPart.Position
-                    )
+                    closestDist = dist
+                    closest = plr
                 end
             end
         end
-    end)
+    end
+
+    return closest
+end
+
+-----------------------------
+-- AIMLOCK LOOP
+-----------------------------
+RunService.RenderStepped:Connect(function()
+    if not Aimbot.Enabled or not Holding then return end
+
+    if math.random(1, 100) > Aimbot.HitChance then return end
+
+    local target = GetClosest()
+    if not target then return end
+
+    local part = target.Character[Aimbot.TargetPart]
+
+    -- Prediction
+    local predictedPos = part.Position
+    if target.Character:FindFirstChild("HumanoidRootPart") then
+        predictedPos = predictedPos + target.Character.HumanoidRootPart.Velocity * Aimbot.Prediction
+    end
+
+    -- Smooth aim
+    local newCF = CFrame.new(Camera.CFrame.Position, predictedPos)
+    Camera.CFrame = Camera.CFrame:Lerp(newCF, Aimbot.Smoothness)
+end)
+
+-----------------------------
+-- INPUT HANDLING
+-----------------------------
+UIS.InputBegan:Connect(function(input)
+    if input.UserInputType == Aimbot.HoldKey then
+        Holding = true
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Aimbot.HoldKey then
+        Holding = false
+    end
+end)
+
+-----------------------------
+-- UI IMPLEMENTATION
+-----------------------------
+local CombatTab = Library:Tab("Combat")
+local Section = CombatTab:Section("Aimlock")
+
+Section:Toggle("Enable Aimlock", false, function(v)
+    Aimbot.Enabled = v
+end)
+
+Section:Slider("FOV", 120, 50, 300, function(v)
+    Aimbot.FOV = v
+end)
+
+Section:Slider("Smoothness", 0.20, 0.01, 1, function(v)
+    Aimbot.Smoothness = v
+end)
+
+Section:Slider("Prediction", 0.12, 0, 0.5, function(v)
+    Aimbot.Prediction = v
+end)
+
+Section:Slider("Hit Chance", 100, 1, 100, function(v)
+    Aimbot.HitChance = v
+end)
+
+Section:Toggle("Wall Check", true, function(v)
+    Aimbot.WallCheck = v
+end)
+
+Section:Toggle("Team Check", false, function(v)
+    Aimbot.TeamCheck = v
+end)
+
+Section:Dropdown("Target Part", {"Head", "HumanoidRootPart"}, "Head", function(v)
+    Aimbot.TargetPart = v
 end)
 
 ----------------------------------------------------
