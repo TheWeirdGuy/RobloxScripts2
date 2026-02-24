@@ -1,37 +1,13 @@
-local Library = loadstring(game:HttpGet('https://raw.githubusercontent.com/Rain-Design/Unnamed/main/Library.lua'))()
-Library.Theme = "Dark"
-local Flags = Library.Flags
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("Baseplate", "DarkTheme")
 
-local Window = Library:Window({
-    Text = "Baseplate"
-})
+local Main = Window:NewTab("Main")
+local Section = Main:NewSection("Player Settings")
 
-local Tab = Window:Tab({
-    Text = "Main"
-})
+Section:NewSlider("Speed", "Change WalkSpeed", 200, 16, function(value)
+    game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = value
+end)
 
-local Section = Tab:Section({
-    Text = "Player Settings"
-})
-
-Section:Slider({
-    Text = "Speed",
-    Default = 16,
-    Minimum = 0,
-    Maximum = 200,
-    Callback = function(value)
-        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = value
-    end
-})
-
-Section:Slider({
-    Text = "Jump",
-    Default = 50,
-    Minimum = 0,
-    Maximum = 200,
-    Callback = function(value)
-        game.Players.LocalPlayer.Character.Humanoid.JumpPower = value
-    end
-})
-
-Tab:Select()
+Section:NewSlider("Jump", "Change JumpPower", 200, 50, function(value)
+    game.Players.LocalPlayer.Character.Humanoid.JumpPower = value
+end)
